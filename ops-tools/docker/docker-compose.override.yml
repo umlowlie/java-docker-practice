@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: ops-tools/docker/images/app/Dockerfile.dev
+    ports:
+      - "8888:8080"
+    volumes:
+      - ../..:/app
+    command: mvn spring-boot:run
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment:
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      SPRING_DEVTOOLS_RESTART_POLL_INTERVAL: "1s"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/school
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: school
+      REDIS_HOST: cache
+      REDIS_PORT: 6379
+    networks:
+      - docker-practice-net
+
+  db:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: school
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: school
+    volumes:
+      - ../../data/postgres:/var/lib/postgresql/data
+      - ../../data/dump:/db-dump
+    networks:
+      - docker-practice-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d school" ]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+
+  cache:
+    image: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - docker-practice-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+networks:
+  docker-practice-net:
+    driver: bridge
